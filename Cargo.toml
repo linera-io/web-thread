@@ -1,0 +1,26 @@
+[workspace]
+resolver = "3"
+members = [
+  ".",
+  "examples/library",
+]
+
+[package]
+name = "web-thread"
+version = "0.1.0"
+edition = "2024"
+authors = ["James Kay <james.kay@linera.io>"]
+
+[dependencies]
+futures = "0.3.31"
+serde = "1.0.219"
+serde-wasm-bindgen = "0.6.5"
+thiserror = "2.0.16"
+wasm-bindgen-futures = "0.4.50"
+
+  [dependencies.web-sys]
+  version = "0.3.77"
+  features = [
+    "MessagePort",
+    "Worker",
+  ]

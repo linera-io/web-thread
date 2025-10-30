@@ -1,0 +1,29 @@
+[package]
+name = "web-thread-consuming-library"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+futures-executor = "0.3.31"
+serde-wasm-bindgen = "0.6.5"
+wasm-bindgen = "=0.2.104"
+wasm-bindgen-futures = "0.4.50"
+wasm-bindgen-test = "0.3.50"
+web-thread.path = "../.."
+
+  [dependencies.serde]
+  version = "1.0.228"
+  features = ["derive"]
+  
+  [dependencies.web-sys]
+  version = "0.3.81"
+  features = [
+    "console",
+    "MessageChannel",
+    "MessageEvent",
+    "MessagePort",
+  ]

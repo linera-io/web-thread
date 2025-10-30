@@ -1,0 +1,8 @@
+{
+    "dependencies": {
+        "@web-thread/library": "workspace:*"
+    },
+    "devDependencies": {
+        "vite": "^7.1.12"
+    }
+}

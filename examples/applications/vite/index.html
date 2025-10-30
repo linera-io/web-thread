@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Example Consuming Application</title>
+  <body>
+    <script type="module">
+     import { initialize, run } from '@web-thread/library';
+     await initialize();
+     const answer = await run();
+     console.assert(answer === 15, answer);
+     console.log('answer was', answer);
+    </script>
+  </body>
+</html>
