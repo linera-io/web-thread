@@ -72,9 +72,9 @@ more information:
 */
 
 use futures::future;
-use web_sys::{js_sys, wasm_bindgen};
-use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
+use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 use wasm_bindgen_futures::JsFuture;
+use web_sys::{js_sys, wasm_bindgen};
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -83,6 +83,7 @@ extern "C" {
     type Client;
     #[wasm_bindgen(catch, constructor)]
     fn new(module: JsValue, memory: JsValue) -> Result<Client, JsValue>;
+
     #[wasm_bindgen(method)]
     fn run(
         this: &Client,
@@ -93,19 +94,19 @@ extern "C" {
 }
 
 /// A representation of a JavaScript thread (Web worker with shared memory).
-pub struct Thread {
-    js: Client,
-}
+pub struct Thread(Client);
 
 impl Thread {
     /// Spawn a new thread.
+    ///
+    /// # Errors
+    ///
+    /// If the worker can't be started or initialized with the shared memory.
     pub fn new() -> Result<Self, Error> {
-        Ok(Self {
-            js: Client::new(
-                wasm_bindgen::module(),
-                wasm_bindgen::memory(),
-            )?,
-        })
+        Ok(Self(Client::new(
+            wasm_bindgen::module(),
+            wasm_bindgen::memory(),
+        )?))
     }
 
     /// Execute a function on a thread.
@@ -135,23 +136,27 @@ impl Thread {
         context: Context,
         code: impl FnOnce(Context) -> F + Send + 'static,
     ) -> impl Future<Output = Result<F::Output>> {
+        // While not syntactically consumed, the use of `postMessage`
+        // here may leave `Context` in an invalid state (setting
+        // transferred JavaScript values to `undefined`).
+        #![allow(clippy::needless_pass_by_value)]
+
         let transfer = context.transferables();
         let context = match serde_wasm_bindgen::to_value(&context) {
             Ok(context) => context,
             Err(error) => return future::Either::Left(async { Err(error.into()) }),
         };
-        let promise = self.js.run(
-            Code::new(code).into(),
-            context,
-            transfer,
-        );
+        let promise = self.0.run(Code::new(code).into(), context, transfer);
         future::Either::Right(async {
-            Ok(serde_wasm_bindgen::from_value(JsFuture::from(promise).await?)?)
+            Ok(serde_wasm_bindgen::from_value(
+                JsFuture::from(promise).await?,
+            )?)
         })
     }
 }
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_wasm_bindgen::Error),
@@ -188,11 +193,20 @@ pub trait PostExt {
     ///
     /// This function consumes `message`, as in general it may leave
     /// the object in an incoherent state.
+    ///
+    /// # Errors
+    ///
+    /// If the message could not be sent.
     fn post(&self, message: impl Post) -> Result<(), JsValue>;
 }
 
 impl PostExt for web_sys::MessagePort {
     fn post(&self, message: impl Post) -> Result<(), JsValue> {
+        // While not syntactically consumed, the use of `postMessage`
+        // here may leave `Context` in an invalid state (setting
+        // transferred JavaScript values to `undefined`).
+        #![allow(clippy::needless_pass_by_value)]
+
         self.post_message_with_transferable(
             &serde_wasm_bindgen::to_value(&message)?,
             &message.transferables(),
@@ -202,6 +216,11 @@ impl PostExt for web_sys::MessagePort {
 
 impl PostExt for web_sys::Worker {
     fn post(&self, message: impl Post) -> Result<(), JsValue> {
+        // While not syntactically consumed, the use of `postMessage`
+        // here may leave `Context` in an invalid state (setting
+        // transferred JavaScript values to `undefined`).
+        #![allow(clippy::needless_pass_by_value)]
+
         self.post_message_with_transfer(
             &serde_wasm_bindgen::to_value(&message)?,
             &message.transferables(),
@@ -209,7 +228,7 @@ impl PostExt for web_sys::Worker {
     }
 }
 
-impl Post for u8 { }
+impl Post for u8 {}
 
 /// A serializable (JS-friendly) representation of a message plus its
 /// transferables.
@@ -223,6 +242,11 @@ struct Postable {
 
 impl Postable {
     fn new(message: impl Post) -> Result<Self, serde_wasm_bindgen::Error> {
+        // While not syntactically consumed, the use of `postMessage`
+        // may leave `Context` in an invalid state (setting
+        // transferred JavaScript values to `undefined`).
+        #![allow(clippy::needless_pass_by_value)]
+
         Ok(Self {
             message: serde_wasm_bindgen::to_value(&message)?,
             transfer: message.transferables(),
@@ -230,22 +254,29 @@ impl Postable {
     }
 }
 
+type Task = std::pin::Pin<Box<dyn Future<Output = Result<Postable, JsValue>>>>;
+type RemoteTask = Box<dyn FnOnce(JsValue) -> Task + Send>;
+
 struct Code {
     // The second box allows us to represent this as a thin pointer
     // (Wasm: u32) which, unlike fat pointers (Wasm: u64) is within
     // the [JavaScript safe integer
     // range](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isSafeInteger).
-    code: Option<Box<Box<dyn FnOnce(JsValue) -> std::pin::Pin<Box<dyn Future<Output = Result<Postable, JsValue>>>> + Send>>>,
+    code: Option<Box<RemoteTask>>,
 }
 
 impl Code {
-    fn new<F: Future<Output: Post> + 'static, Context: Post>(code: impl FnOnce(Context) -> F + Send + 'static) -> Self {
+    fn new<F: Future<Output: Post> + 'static, Context: Post>(
+        code: impl FnOnce(Context) -> F + Send + 'static,
+    ) -> Self {
         Self {
             code: Some(Box::new(Box::new(|context| {
                 Box::pin(async move {
-                    Ok(Postable::new(code(serde_wasm_bindgen::from_value(context)?).await)?)
+                    Ok(Postable::new(
+                        code(serde_wasm_bindgen::from_value(context)?).await,
+                    )?)
                 })
-            })))
+            }))),
         }
     }
 
@@ -257,7 +288,11 @@ impl Code {
     ///
     /// Must only be called on `JsValue`s created with the
     /// `Into<JsValue>` implementation.
-    unsafe fn from_js_value(js_value: JsValue) -> Self {
+    unsafe fn from_js_value(js_value: &JsValue) -> Self {
+        // We know this doesn't truncate or lose sign as the `f64` is
+        // a representation of a 32-bit pointer.
+        #![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+
         Self {
             code: Some(unsafe { Box::from_raw(js_value.as_f64().unwrap() as u32 as _) }),
         }
@@ -272,10 +307,12 @@ impl From<Code> for JsValue {
 
 #[doc(hidden)]
 #[wasm_bindgen]
-pub async unsafe fn __web_thread_worker_entry_point(code: JsValue, context: JsValue) -> Result<JsValue, JsValue> {
-    let code = unsafe { Code::from_js_value(code) };
-    serde_wasm_bindgen::to_value(&code.call_once(context).await?)
-        .map_err(|e| JsValue::from(e).into())
+pub async unsafe fn __web_thread_worker_entry_point(
+    code: JsValue,
+    context: JsValue,
+) -> Result<JsValue, JsValue> {
+    let code = unsafe { Code::from_js_value(&code) };
+    serde_wasm_bindgen::to_value(&code.call_once(context).await?).map_err(Into::into)
 }
 
 #[wasm_bindgen(module = "/src/worker.js")]

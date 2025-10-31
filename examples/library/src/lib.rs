@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_imports)]
 
+use wasm_bindgen::prelude::{JsCast as _, JsError, JsValue, wasm_bindgen};
 use web_sys::{js_sys, wasm_bindgen};
-use wasm_bindgen::prelude::{wasm_bindgen, JsCast as _, JsError, JsValue};
 
 use web_thread::PostExt as _;
 
@@ -19,7 +19,10 @@ impl Context {
         });
         self.port.post(0u8).unwrap();
         let message = wasm_bindgen_futures::JsFuture::from(promise).await?;
-        Ok(serde_wasm_bindgen::from_value(message.dyn_into::<web_sys::MessageEvent>()?.data()).unwrap())
+        Ok(
+            serde_wasm_bindgen::from_value(message.dyn_into::<web_sys::MessageEvent>()?.data())
+                .unwrap(),
+        )
     }
 }
 
@@ -42,7 +45,12 @@ pub async fn run() -> Result<u8, JsValue> {
         channel.port2().set_onmessage(Some(&resolve));
         channel.port2().set_onmessageerror(Some(&reject));
     });
-    let job = thread.run(Context { port: channel.port1() }, calculate);
+    let job = thread.run(
+        Context {
+            port: channel.port1(),
+        },
+        calculate,
+    );
     let _zero = wasm_bindgen_futures::JsFuture::from(message).await.unwrap();
     channel.port2().post(12u8)?;
     Ok(job.await.map_err(JsError::from)?)
