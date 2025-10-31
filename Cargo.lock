@@ -446,6 +446,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-thread-shim"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "thiserror",
+]
+
+[[package]]
 name = "winapi-util"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
