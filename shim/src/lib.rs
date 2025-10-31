@@ -12,7 +12,6 @@ Just use `std::thread`.
  */
 
 use futures::{
-    future::Future,
     channel::{mpsc, oneshot},
     task::LocalFutureObj,
 };

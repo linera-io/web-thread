@@ -5,6 +5,11 @@ members = [
   "examples/library",
 ]
 
+  [workspace.package]
+  authors = ["James Kay <james.kay@linera.io>"]
+  license = "Apache-2.0"
+  repository = "https://github.com/linera-io/web-thread"
+
 [lints.clippy]
 pedantic = "warn"
 
@@ -12,7 +17,10 @@ pedantic = "warn"
 name = "web-thread"
 version = "0.1.0"
 edition = "2024"
-authors = ["James Kay <james.kay@linera.io>"]
+
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
 [dependencies]
 futures = "0.3.31"
