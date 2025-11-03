@@ -13,16 +13,23 @@ Just use `std::thread`.
 
 use futures::{
     channel::{mpsc, oneshot},
+    future::FutureExt as _,
     task::LocalFutureObj,
 };
 
+use std::pin::Pin;
+use std::task::{
+    Context,
+    Poll,
+};
+
 /// The type of errors that may arise from operations in this crate.
-/// In this shim, this is an empty enum (as the operations are
-/// infallible), but this type is provided anyway for compatibility
-/// with `web-thread`.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum Error {}
+pub enum Error {
+    #[error("thread killed before task completed")]
+    Killed(#[from] oneshot::Canceled),
+}
 
 /// Convenience alias for `Result<T, Error>`.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -34,14 +41,23 @@ pub struct Thread {
 
 type Request = Box<dyn FnOnce() -> LocalFutureObj<'static, ()> + Send>;
 
+/// A task that's been spawned on a [`Thread`] that should eventually
+/// compute a `T`.
+pub struct Task<T> {
+    receiver: oneshot::Receiver<T>,
+}
+
+impl<T> Future for Task<T> {
+    type Output = Result<T>;
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        self.receiver.poll_unpin(context).map(|ready| ready.map_err(Into::into))
+    }
+}
+
 impl Thread {
     /// Create a new background thread to run tasks.
-    ///
-    /// # Errors
-    ///
-    /// Never, actually: the error is here just for compatibility with
-    /// `web-thread`.
-    pub fn new() -> Result<Self, Error> {
+    pub fn new() -> Self {
         let (sender, mut receiver) = mpsc::unbounded::<Request>();
         std::thread::spawn(|| {
             use futures::{StreamExt as _, executor::LocalPool, task::LocalSpawn as _};
@@ -55,20 +71,18 @@ impl Thread {
                 }
             });
         });
-        Ok(Self { sender })
+        Self { sender }
     }
 
-    /// Run a future on a separate thread.
+    /// Execute a function on a thread.
     ///
-    /// # Errors
-    ///
-    /// Never, actually: the error is here just for compatibility with
-    /// `web-thread`.
+    /// The function will begin executing immediately.  The resulting
+    /// [`Task`] can be awaited to retrieve the result.
     pub fn run<Context: Post, F: Future<Output: Post> + 'static>(
         &self,
         context: Context,
         code: impl FnOnce(Context) -> F + Send + 'static,
-    ) -> impl Future<Output = Result<F::Output>> + '_ {
+    ) -> Task<F::Output> {
         let (sender, receiver) = oneshot::channel::<F::Output>();
         self.sender
             .unbounded_send(Box::new(move || {
@@ -78,10 +92,8 @@ impl Thread {
                 .into()
             }))
             .unwrap_or_else(|_| panic!("worker shouldn't die unless dropped"));
-        async move {
-            Ok(receiver
-                .await
-                .unwrap_or_else(|_| panic!("worker shouldn't die unless dropped")))
+        Task {
+            receiver,
         }
     }
 }

@@ -75,7 +75,10 @@ mod post;
 use post::*;
 pub use post::{Post, PostExt};
 
-use futures::future;
+use std::pin::Pin;
+use std::task::{ready, Context, Poll};
+
+use futures::{future, FutureExt as _, TryFutureExt as _};
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen};
@@ -85,8 +88,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[wasm_bindgen(module = "/src/Client.js")]
 extern "C" {
     type Client;
-    #[wasm_bindgen(catch, constructor)]
-    fn new(module: JsValue, memory: JsValue) -> Result<Client, JsValue>;
+    #[wasm_bindgen(constructor)]
+    fn new(module: JsValue, memory: JsValue) -> Client;
 
     #[wasm_bindgen(method)]
     fn run(
@@ -103,24 +106,43 @@ extern "C" {
 /// A representation of a JavaScript thread (Web worker with shared memory).
 pub struct Thread(Client);
 
+pin_project_lite::pin_project! {
+    /// A task that's been spawned on a [`Thread`].
+    ///
+    /// Dropping the thread before the task is complete will result in the
+    /// task erroring.
+    pub struct Task<T> {
+        result: future::Either<
+            future::MapErr<JsFuture, fn(JsValue) -> Error>,
+            future::Ready<Result<JsValue>>,
+        >,
+        _phantom: std::marker::PhantomData<T>,
+    }
+}
+
+impl<T: Post> Future for Task<T> {
+    type Output = Result<T>;
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Ready(
+            ready!(self.result.poll_unpin(context))
+                .and_then(|output| Ok(serde_wasm_bindgen::from_value(output)?)))
+    }
+}
+
 impl Thread {
     /// Spawn a new thread.
-    ///
-    /// # Errors
-    ///
-    /// If the worker can't be started or initialized with the shared memory.
-    pub fn new() -> Result<Self, Error> {
-        Ok(Self(Client::new(
+    pub fn new() -> Self {
+        Self(Client::new(
             wasm_bindgen::module(),
             wasm_bindgen::memory(),
-        )?))
+        ))
     }
 
     /// Execute a function on a thread.
     ///
-    /// In JavaScript style, the function will begin executing
-    /// immediately.  The resulting `Future` can be awaited to
-    /// retrieve the result.
+    /// The function will begin executing immediately.  The resulting
+    /// [`Task`] can be awaited to retrieve the result.
     ///
     /// # Arguments
     ///
@@ -142,23 +164,20 @@ impl Thread {
         &self,
         context: Context,
         code: impl FnOnce(Context) -> F + Send + 'static,
-    ) -> impl Future<Output = Result<F::Output>> {
+    ) -> Task<F::Output> {
         // While not syntactically consumed, the use of `postMessage`
         // here may leave `Context` in an invalid state (setting
         // transferred JavaScript values to `undefined`).
         #![allow(clippy::needless_pass_by_value)]
 
         let transfer = context.transferables();
-        let context = match serde_wasm_bindgen::to_value(&context) {
-            Ok(context) => context,
-            Err(error) => return future::Either::Left(async { Err(error.into()) }),
-        };
-        let promise = self.0.run(Code::new(code).into(), context, transfer);
-        future::Either::Right(async {
-            Ok(serde_wasm_bindgen::from_value(
-                JsFuture::from(promise).await?,
-            )?)
-        })
+        Task {
+            _phantom: Default::default(),
+            result: match serde_wasm_bindgen::to_value(&context) {
+                Ok(context) => future::Either::Left(JsFuture::from(self.0.run(Code::new(code).into(), context, transfer)).map_err(Into::into)),
+                Err(error) => future::Either::Right(future::ready(Err(error.into()))),
+            },
+        }
     }
 }
 
@@ -183,8 +202,8 @@ impl From<JsValue> for Error {
     }
 }
 
-type Task = std::pin::Pin<Box<dyn Future<Output = Result<Postable, JsValue>>>>;
-type RemoteTask = Box<dyn FnOnce(JsValue) -> Task + Send>;
+type JsTask = std::pin::Pin<Box<dyn Future<Output = Result<Postable, JsValue>>>>;
+type RemoteTask = Box<dyn FnOnce(JsValue) -> JsTask + Send>;
 
 struct Code {
     // The second box allows us to represent this as a thin pointer
