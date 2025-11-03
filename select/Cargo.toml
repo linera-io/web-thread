@@ -1,0 +1,17 @@
+[package]
+name = "web-thread-select"
+version = "0.1.0"
+edition = "2024"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+web = ["web-thread"]
+
+[dependencies.web-thread]
+path = ".."
+optional = true
+
+[dependencies.web-thread-shim]
+path = "../shim"

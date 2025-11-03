@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
-  "shim",
   "examples/library",
+  "select",
+  "shim",
 ]
 
   [workspace.package]
