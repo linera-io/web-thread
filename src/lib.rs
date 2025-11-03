@@ -91,6 +91,9 @@ extern "C" {
         context: JsValue,
         transfer: js_sys::Array,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(method)]
+    fn destroy(this: &Client);
 }
 
 /// A representation of a JavaScript thread (Web worker with shared memory).
@@ -152,6 +155,12 @@ impl Thread {
                 JsFuture::from(promise).await?,
             )?)
         })
+    }
+}
+
+impl Drop for Thread {
+    fn drop(&mut self) {
+        self.0.destroy();
     }
 }
 
