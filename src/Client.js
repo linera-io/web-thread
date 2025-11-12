@@ -1,6 +1,11 @@
 // @ts-check
 
-export class Client {
+// We prefix this class with the crate name to reduce the chance of
+// conflicts with `Client` classes in other crates, since
+// `wasm-bindgen` doesn't qualify imports
+// (https://github.com/wasm-bindgen/wasm-bindgen/issues/2798).
+
+export class web_thread$Client {
   constructor(module, memory) {
     this.nextId = 0;
     this.promises = new Map();

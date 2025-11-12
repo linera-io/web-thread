@@ -89,11 +89,13 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[wasm_bindgen(module = "/src/Client.js")]
 extern "C" {
+    // We would like to give this a better name with `js_name`, but `js_name`
+    #[wasm_bindgen(js_name = "web_thread$Client")]
     type Client;
-    #[wasm_bindgen(constructor)]
+    #[wasm_bindgen(constructor, js_class = "web_thread$Client")]
     fn new(module: JsValue, memory: JsValue) -> Client;
 
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(js_class = "web_thread$Client", method)]
     fn run(
         this: &Client,
         code: JsValue,
@@ -101,7 +103,7 @@ extern "C" {
         transfer: js_sys::Array,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(js_class = "web_thread$Client", method)]
     fn destroy(this: &Client);
 }
 
