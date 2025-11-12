@@ -71,6 +71,8 @@ more information:
 
 */
 
+mod error;
+
 mod post;
 use post::*;
 pub use post::{Post, PostExt};
@@ -126,7 +128,7 @@ impl<T: Post> Future for Task<T> {
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(
             ready!(self.result.poll_unpin(context))
-                .and_then(|output| Ok(serde_wasm_bindgen::from_value(output)?)))
+                .and_then(|output| Ok(T::from_js(output)?)))
     }
 }
 
@@ -173,7 +175,7 @@ impl Thread {
         let transfer = context.transferables();
         Task {
             _phantom: Default::default(),
-            result: match serde_wasm_bindgen::to_value(&context) {
+            result: match context.to_js() {
                 Ok(context) => future::Either::Left(JsFuture::from(self.0.run(Code::new(code).into(), context, transfer)).map_err(Into::into)),
                 Err(error) => future::Either::Right(future::ready(Err(error.into()))),
             },
@@ -187,20 +189,8 @@ impl Drop for Thread {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum Error {
-    #[error("serialization error: {0}")]
-    Serialization(#[from] serde_wasm_bindgen::Error),
-    #[error("JavaScript error: {0:?}")]
-    Js(JsValue),
-}
-
-impl From<JsValue> for Error {
-    fn from(js_value: JsValue) -> Self {
-        Self::Js(js_value)
-    }
-}
+/// The type of errors that can be thrown in the course of executing a thread.
+pub type Error = error::Error;
 
 type JsTask = std::pin::Pin<Box<dyn Future<Output = Result<Postable, JsValue>>>>;
 type RemoteTask = Box<dyn FnOnce(JsValue) -> JsTask + Send>;
@@ -221,7 +211,7 @@ impl Code {
             code: Some(Box::new(Box::new(|context| {
                 Box::pin(async move {
                     Ok(Postable::new(
-                        code(serde_wasm_bindgen::from_value(context)?).await,
+                        code(Context::from_js(context)?).await,
                     )?)
                 })
             }))),

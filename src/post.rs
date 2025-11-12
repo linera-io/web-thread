@@ -5,7 +5,7 @@ use super::{JsValue, js_sys};
 /// sent using `postMessage`, and also getting an array of subobjects
 /// that must be
 /// [transferred](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects).
-pub trait Post: serde::ser::Serialize + serde::de::DeserializeOwned {
+pub trait Post: AsJs {
     /// Get a list of the objects that must be
     /// transferred when calling `postMessage`.
     ///
@@ -37,10 +37,7 @@ impl PostExt for web_sys::MessagePort {
         // transferred JavaScript values to `undefined`).
         #![allow(clippy::needless_pass_by_value)]
 
-        self.post_message_with_transferable(
-            &serde_wasm_bindgen::to_value(&message)?,
-            &message.transferables(),
-        )
+        self.post_message_with_transferable(&message.to_js()?, &message.transferables())
     }
 }
 
@@ -51,10 +48,7 @@ impl PostExt for web_sys::Worker {
         // transferred JavaScript values to `undefined`).
         #![allow(clippy::needless_pass_by_value)]
 
-        self.post_message_with_transfer(
-            &serde_wasm_bindgen::to_value(&message)?,
-            &message.transferables(),
-        )
+        self.post_message_with_transfer(&message.to_js()?, &message.transferables())
     }
 }
 
@@ -69,16 +63,32 @@ pub struct Postable {
 }
 
 impl Postable {
-    pub fn new(message: impl Post) -> Result<Self, serde_wasm_bindgen::Error> {
+    pub fn new(message: impl Post) -> Result<Self, JsValue> {
         // While not syntactically consumed, the use of `postMessage`
         // may leave `Context` in an invalid state (setting
         // transferred JavaScript values to `undefined`).
         #![allow(clippy::needless_pass_by_value)]
 
         Ok(Self {
-            message: serde_wasm_bindgen::to_value(&message)?,
+            message: message.to_js()?,
             transfer: message.transferables(),
         })
+    }
+}
+
+/// An object-safe version of `std::convert::Into`.
+pub trait AsJs {
+    fn to_js(&self) -> Result<JsValue, JsValue>;
+    fn from_js(js_value: JsValue) -> Result<Self, JsValue> where Self: Sized;
+}
+
+impl<T: serde::Serialize + serde::de::DeserializeOwned> AsJs for T {
+    fn to_js(&self) -> Result<JsValue, JsValue> {
+        Ok(serde_wasm_bindgen::to_value(self)?)
+    }
+
+    fn from_js(value: JsValue) -> Result<Self, JsValue> where Self: Sized {
+        Ok(serde_wasm_bindgen::from_value(value)?)
     }
 }
 
@@ -86,3 +96,20 @@ impl Post for () {}
 impl Post for u8 {}
 impl Post for u16 {}
 impl Post for u32 {}
+impl Post for u64 {}
+impl Post for u128 {}
+impl Post for i8 {}
+impl Post for i16 {}
+impl Post for i32 {}
+impl Post for i64 {}
+impl Post for i128 {}
+impl Post for String {}
+
+impl<T: Post, E: Post> Post for Result<T, E> where Result<T, E>: AsJs {
+    fn transferables(&self) -> js_sys::Array {
+        match self {
+            Ok(x) => x.transferables(),
+            Err(e) => e.transferables(),
+        }
+    }
+}
