@@ -11,7 +11,7 @@
         "rootDir": "src",
         "declaration": true,
         "paths": {
-            "web-thread:wasm-shim": ["./src/wasm/library.js"]
+            "web-thread:wasm-shim": ["./src/wasm/index.js"]
         }
     },
     "tsc-alias": {

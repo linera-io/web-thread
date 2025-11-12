@@ -34,11 +34,12 @@ cargo build --lib --target wasm32-unknown-unknown $profile_flag
 wasm-bindgen \
     $binary_path \
     --out-dir src/wasm \
+    --out-name index \
     --typescript \
     --target web
 
 mkdir -p dist/wasm
-cp src/wasm/"${binary_name}"_bg.wasm{,.d.ts} dist/wasm
+cp src/wasm/index_bg.wasm{,.d.ts} dist/wasm
 
 pnpm exec tsc
 pnpm exec tsc-alias

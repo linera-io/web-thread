@@ -1,6 +1,6 @@
-export { run } from './wasm/library.js';
+export { run } from './wasm/index.js';
 
-import { default as init } from './wasm/library.js';
+import { default as init } from './wasm/index.js';
 
 import { ethers } from 'ethers';
 

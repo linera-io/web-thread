@@ -39,7 +39,7 @@ async fn calculate(context: Context) -> u8 {
 
 #[wasm_bindgen]
 pub async fn run() -> Result<u8, JsValue> {
-    let thread = web_thread::Thread::new().map_err(JsError::from)?;
+    let thread = web_thread::Thread::new();
     let channel = web_sys::MessageChannel::new()?;
     let message = js_sys::Promise::new(&mut |resolve, reject| {
         channel.port2().set_onmessage(Some(&resolve));
