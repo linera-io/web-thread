@@ -47,6 +47,19 @@ pub struct Task<T> {
     receiver: oneshot::Receiver<T>,
 }
 
+
+/// A [`Task`] with a `Send` output.
+/// See [`Task::run_send`] for usage.
+pub struct SendTask<T>(Task<T>);
+
+impl<T: Send> Future for SendTask<T> {
+    type Output = Result<T>;
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        self.0.poll_unpin(context)
+    }
+}
+
 impl<T> Future for Task<T> {
     type Output = Result<T>;
 
@@ -95,6 +108,18 @@ impl Thread {
         Task {
             receiver,
         }
+    }
+
+    /// Like [`Thread::run`], but the output can be sent through Rust
+    /// memory without `Post`ing.
+    ///
+    /// In this shim, this is equivalent to [`Thread::run`].
+    pub fn run_send<Context: Post, F: Future<Output: Send> + 'static>(
+        &self,
+        context: Context,
+        code: impl FnOnce(Context) -> F + Send + 'static,
+    ) -> SendTask<F::Output> {
+        SendTask(self.run(context, code))
     }
 }
 

@@ -75,12 +75,12 @@ mod error;
 
 mod post;
 use post::*;
-pub use post::{Post, PostExt};
+pub use post::{AsJs, Post, PostExt};
 
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use futures::{future, FutureExt as _, TryFutureExt as _};
+use futures::{channel::oneshot, future, FutureExt as _, TryFutureExt as _};
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen};
@@ -126,9 +126,26 @@ impl<T: Post> Future for Task<T> {
     type Output = Result<T>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(
-            ready!(self.result.poll_unpin(context))
-                .and_then(|output| Ok(T::from_js(output)?)))
+        Poll::Ready(Ok(T::from_js(ready!(self.result.poll_unpin(context))?)?))
+    }
+}
+
+pin_project_lite::pin_project! {
+    /// A [`Task`] with a `Send` output.
+    /// See [`Task::run_send`] for usage.
+    pub struct SendTask<T> {
+        task: Task<()>,
+        receiver: oneshot::Receiver<T>,
+    }
+}
+
+impl<T: Send> Future for SendTask<T> {
+    type Output = Result<T>;
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        ready!(self.task.poll_unpin(context))?;
+        Poll::Ready(Ok(ready!(self.receiver.poll_unpin(context))
+            .expect("task already completed successfully")))
     }
 }
 
@@ -179,6 +196,22 @@ impl Thread {
                 Ok(context) => future::Either::Left(JsFuture::from(self.0.run(Code::new(code).into(), context, transfer)).map_err(Into::into)),
                 Err(error) => future::Either::Right(future::ready(Err(error.into()))),
             },
+        }
+    }
+
+    /// Like [`Thread::run`], but the output can be sent through Rust
+    /// memory without `Post`ing.
+    pub fn run_send<Context: Post, F: Future<Output: Send> + 'static>(
+        &self,
+        context: Context,
+        code: impl FnOnce(Context) -> F + Send + 'static,
+    ) -> SendTask<F::Output> {
+        let (sender, receiver) = oneshot::channel();
+        SendTask {
+            task: self.run(context, |context| code(context).map(|outcome| {
+                let _ = sender.send(outcome);
+            })),
+            receiver,
         }
     }
 }
