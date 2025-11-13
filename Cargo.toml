@@ -16,6 +16,7 @@ pedantic = "warn"
 
 [package]
 name = "web-thread"
+description = "Convenient Web worker threading library with transferable support"
 version = "0.1.0"
 edition = "2024"
 

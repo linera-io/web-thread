@@ -1,5 +1,6 @@
 [package]
 name = "web-thread-shim"
+description = "Native shim for the `web-thread` crate"
 version = "0.1.0"
 edition = "2024"
 
