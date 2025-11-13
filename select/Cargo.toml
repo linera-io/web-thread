@@ -11,6 +11,9 @@ repository.workspace = true
 [features]
 web = ["web-thread"]
 
+[dependencies]
+cfg-if = "1.0.4"
+
 [dependencies.web-thread]
 workspace = true
 optional = true
