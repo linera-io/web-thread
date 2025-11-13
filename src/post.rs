@@ -76,9 +76,25 @@ impl Postable {
     }
 }
 
-/// An object-safe version of `std::convert::Into`.
+/// An object-safe version of
+/// `std::convert::TryInto`/`std::convert::TryFrom`, relying on the
+/// JavaScript GC.
 pub trait AsJs {
+    /// Retrieve the JavaScript representation of a value.
+    ///
+    /// # Errors
+    ///
+    /// If the value could not be represented as a JavaScript value.
     fn to_js(&self) -> Result<JsValue, JsValue>;
+    /// Construct the value from its JavaScript representation.
+    /// Unlike [`to_js`] this function consumes its argument, as the
+    /// value or its subvalues may be transferred into the resulting
+    /// Rust object.
+    ///
+    /// # Errors
+    ///
+    /// If the value could not be reconstructed from the provided
+    /// JavaScript value.
     fn from_js(js_value: JsValue) -> Result<Self, JsValue>
     where
         Self: Sized;

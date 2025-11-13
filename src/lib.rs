@@ -80,7 +80,7 @@ use std::{
 };
 
 use futures::{FutureExt as _, TryFutureExt as _, channel::oneshot, future};
-use post::*;
+use post::Postable;
 pub use post::{AsJs, Post, PostExt};
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 use wasm_bindgen_futures::JsFuture;
@@ -155,6 +155,7 @@ impl<T: Send> Future for SendTask<T> {
 
 impl Thread {
     /// Spawn a new thread.
+    #[must_use]
     pub fn new() -> Self {
         Self(Client::new(wasm_bindgen::module(), wasm_bindgen::memory()))
     }
@@ -192,7 +193,7 @@ impl Thread {
 
         let transfer = context.transferables();
         Task {
-            _phantom: Default::default(),
+            _phantom: std::marker::PhantomData,
             result: match context.to_js() {
                 Ok(context) => future::Either::Left(
                     JsFuture::from(self.0.run(Code::new(code).into(), context, transfer))
@@ -222,6 +223,12 @@ impl Thread {
     }
 }
 
+impl Default for Thread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for Thread {
     fn drop(&mut self) {
         self.0.destroy();
@@ -248,7 +255,7 @@ impl Code {
     ) -> Self {
         Self {
             code: Some(Box::new(Box::new(|context| {
-                Box::pin(async move { Ok(Postable::new(code(Context::from_js(context)?).await)?) })
+                Box::pin(async move { Postable::new(code(Context::from_js(context)?).await) })
             }))),
         }
     }

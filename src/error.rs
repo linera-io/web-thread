@@ -33,7 +33,7 @@ impl From<JsValue> for Error {
         Error {
             description: error.message().into(),
             source: Some(error.cause())
-                .filter(|x| x.is_undefined())
+                .filter(JsValue::is_undefined)
                 .map(|x| Box::new(Error::from(x))),
         }
     }
