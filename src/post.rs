@@ -95,6 +95,8 @@ pub trait AsJs {
     ///
     /// If the value could not be reconstructed from the provided
     /// JavaScript value.
+    ///
+    /// [`to_js`]: AsJs::to_js()
     fn from_js(js_value: JsValue) -> Result<Self, JsValue>
     where
         Self: Sized;

@@ -90,7 +90,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[wasm_bindgen(module = "/src/Client.js")]
 extern "C" {
-    // We would like to give this a better name with `js_name`, but `js_name`
     #[wasm_bindgen(js_name = "web_thread$Client")]
     type Client;
     #[wasm_bindgen(constructor, js_class = "web_thread$Client")]
@@ -135,7 +134,7 @@ impl<T: Post> Future for Task<T> {
 
 pin_project_lite::pin_project! {
     /// A [`Task`] with a `Send` output.
-    /// See [`Task::run_send`] for usage.
+    /// See [`Thread::run_send`] for usage.
     pub struct SendTask<T> {
         task: Task<()>,
         receiver: oneshot::Receiver<T>,
