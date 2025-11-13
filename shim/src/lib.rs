@@ -70,6 +70,7 @@ impl<T> Future for Task<T> {
 
 impl Thread {
     /// Create a new background thread to run tasks.
+    #[must_use]
     pub fn new() -> Self {
         let (sender, mut receiver) = mpsc::unbounded::<Request>();
         std::thread::spawn(|| {
@@ -118,6 +119,12 @@ impl Thread {
         code: impl FnOnce(Context) -> F + Send + 'static,
     ) -> SendTask<F::Output> {
         SendTask(self.run(context, code))
+    }
+}
+
+impl Default for Thread {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
