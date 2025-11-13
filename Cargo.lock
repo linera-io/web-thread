@@ -420,7 +420,7 @@ dependencies = [
 
 [[package]]
 name = "web-thread"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "futures",
  "pin-project-lite",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "web-thread-select"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cfg-if",
  "web-thread",
@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "web-thread-shim"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "futures",
  "thiserror",
