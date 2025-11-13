@@ -12,8 +12,8 @@ repository.workspace = true
 web = ["web-thread"]
 
 [dependencies.web-thread]
-path = ".."
+workspace = true
 optional = true
 
 [dependencies.web-thread-shim]
-path = "../shim"
+workspace = true

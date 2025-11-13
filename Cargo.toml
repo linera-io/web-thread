@@ -11,6 +11,18 @@ members = [
   license = "Apache-2.0"
   repository = "https://github.com/linera-io/web-thread"
 
+  [workspace.dependencies.web-thread]
+  version = "0.1.0"
+  path = "."
+
+  [workspace.dependencies.web-thread-shim]
+  version = "0.1.0"
+  path = "shim"
+
+  [workspace.dependencies.web-thread-select]
+  version = "0.1.0"
+  path = "select"
+
 [lints.clippy]
 pedantic = "warn"
 
