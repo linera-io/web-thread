@@ -79,7 +79,9 @@ impl Postable {
 /// An object-safe version of `std::convert::Into`.
 pub trait AsJs {
     fn to_js(&self) -> Result<JsValue, JsValue>;
-    fn from_js(js_value: JsValue) -> Result<Self, JsValue> where Self: Sized;
+    fn from_js(js_value: JsValue) -> Result<Self, JsValue>
+    where
+        Self: Sized;
 }
 
 impl<T: serde::Serialize + serde::de::DeserializeOwned> AsJs for T {
@@ -87,7 +89,10 @@ impl<T: serde::Serialize + serde::de::DeserializeOwned> AsJs for T {
         Ok(serde_wasm_bindgen::to_value(self)?)
     }
 
-    fn from_js(value: JsValue) -> Result<Self, JsValue> where Self: Sized {
+    fn from_js(value: JsValue) -> Result<Self, JsValue>
+    where
+        Self: Sized,
+    {
         Ok(serde_wasm_bindgen::from_value(value)?)
     }
 }
@@ -105,7 +110,10 @@ impl Post for i64 {}
 impl Post for i128 {}
 impl Post for String {}
 
-impl<T: Post, E: Post> Post for Result<T, E> where Result<T, E>: AsJs {
+impl<T: Post, E: Post> Post for Result<T, E>
+where
+    Result<T, E>: AsJs,
+{
     fn transferables(&self) -> js_sys::Array {
         match self {
             Ok(x) => x.transferables(),

@@ -2,7 +2,6 @@
 
 use wasm_bindgen::prelude::{JsCast as _, JsError, JsValue, wasm_bindgen};
 use web_sys::{js_sys, wasm_bindgen};
-
 use web_thread::PostExt as _;
 
 #[derive(serde::Serialize, serde::Deserialize)]

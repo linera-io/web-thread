@@ -74,13 +74,14 @@ more information:
 mod error;
 
 mod post;
+use std::{
+    pin::Pin,
+    task::{Context, Poll, ready},
+};
+
+use futures::{FutureExt as _, TryFutureExt as _, channel::oneshot, future};
 use post::*;
 pub use post::{AsJs, Post, PostExt};
-
-use std::pin::Pin;
-use std::task::{ready, Context, Poll};
-
-use futures::{channel::oneshot, future, FutureExt as _, TryFutureExt as _};
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen};
@@ -146,18 +147,16 @@ impl<T: Send> Future for SendTask<T> {
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(self.task.poll_unpin(context))?;
-        Poll::Ready(Ok(ready!(self.receiver.poll_unpin(context))
-            .expect("task already completed successfully")))
+        Poll::Ready(Ok(
+            ready!(self.receiver.poll_unpin(context)).expect("task already completed successfully")
+        ))
     }
 }
 
 impl Thread {
     /// Spawn a new thread.
     pub fn new() -> Self {
-        Self(Client::new(
-            wasm_bindgen::module(),
-            wasm_bindgen::memory(),
-        ))
+        Self(Client::new(wasm_bindgen::module(), wasm_bindgen::memory()))
     }
 
     /// Execute a function on a thread.
@@ -195,7 +194,10 @@ impl Thread {
         Task {
             _phantom: Default::default(),
             result: match context.to_js() {
-                Ok(context) => future::Either::Left(JsFuture::from(self.0.run(Code::new(code).into(), context, transfer)).map_err(Into::into)),
+                Ok(context) => future::Either::Left(
+                    JsFuture::from(self.0.run(Code::new(code).into(), context, transfer))
+                        .map_err(Into::into),
+                ),
                 Err(error) => future::Either::Right(future::ready(Err(error.into()))),
             },
         }
@@ -210,9 +212,11 @@ impl Thread {
     ) -> SendTask<F::Output> {
         let (sender, receiver) = oneshot::channel();
         SendTask {
-            task: self.run(context, |context| code(context).map(|outcome| {
-                let _ = sender.send(outcome);
-            })),
+            task: self.run(context, |context| {
+                code(context).map(|outcome| {
+                    let _ = sender.send(outcome);
+                })
+            }),
             receiver,
         }
     }
@@ -244,11 +248,7 @@ impl Code {
     ) -> Self {
         Self {
             code: Some(Box::new(Box::new(|context| {
-                Box::pin(async move {
-                    Ok(Postable::new(
-                        code(Context::from_js(context)?).await,
-                    )?)
-                })
+                Box::pin(async move { Ok(Postable::new(code(Context::from_js(context)?).await)?) })
             }))),
         }
     }

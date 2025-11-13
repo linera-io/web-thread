@@ -1,4 +1,4 @@
-use super::{js_sys, wasm_bindgen::JsCast as _, JsValue};
+use super::{JsValue, js_sys, wasm_bindgen::JsCast as _};
 
 #[derive(Debug)]
 pub struct Error {
@@ -22,9 +22,12 @@ impl From<JsValue> for Error {
     fn from(value: JsValue) -> Self {
         let Some(error) = value.dyn_ref::<js_sys::Error>() else {
             return Error {
-                description: format!("could not cast value of type {:?} to `Error`", value.js_typeof()),
+                description: format!(
+                    "could not cast value of type {:?} to `Error`",
+                    value.js_typeof()
+                ),
                 source: None,
-            }
+            };
         };
 
         Error {

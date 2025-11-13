@@ -11,16 +11,15 @@ If you aren't using `web-thread`, you probably don't want this crate!
 Just use `std::thread`.
  */
 
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use futures::{
     channel::{mpsc, oneshot},
     future::FutureExt as _,
     task::LocalFutureObj,
-};
-
-use std::pin::Pin;
-use std::task::{
-    Context,
-    Poll,
 };
 
 /// The type of errors that may arise from operations in this crate.
@@ -47,7 +46,6 @@ pub struct Task<T> {
     receiver: oneshot::Receiver<T>,
 }
 
-
 /// A [`Task`] with a `Send` output.
 /// See [`Task::run_send`] for usage.
 pub struct SendTask<T>(Task<T>);
@@ -64,7 +62,9 @@ impl<T> Future for Task<T> {
     type Output = Result<T>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        self.receiver.poll_unpin(context).map(|ready| ready.map_err(Into::into))
+        self.receiver
+            .poll_unpin(context)
+            .map(|ready| ready.map_err(Into::into))
     }
 }
 
@@ -105,9 +105,7 @@ impl Thread {
                 .into()
             }))
             .unwrap_or_else(|_| panic!("worker shouldn't die unless dropped"));
-        Task {
-            receiver,
-        }
+        Task { receiver }
     }
 
     /// Like [`Thread::run`], but the output can be sent through Rust
