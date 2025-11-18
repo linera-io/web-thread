@@ -1,5 +1,8 @@
 // @ts-check
 
+// Copyright (c) Zefchain Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // This must be made available by the library consumer, since we don't
 // know where it is yet.
 import * as wasm from 'web-thread:wasm-shim';

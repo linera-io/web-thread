@@ -1,3 +1,6 @@
+// Copyright (c) Zefchain Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use super::{JsValue, js_sys};
 
 /// Objects that can be sent via `postMessage`.  A type that is `Post`

@@ -1,5 +1,8 @@
 // @ts-check
 
+// Copyright (c) Zefchain Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // We prefix this class with the crate name to reduce the chance of
 // conflicts with `Client` classes in other crates, since
 // `wasm-bindgen` doesn't qualify imports

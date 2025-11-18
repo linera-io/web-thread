@@ -1,5 +1,7 @@
-/*!
+// Copyright (c) Zefchain Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
 
+/*!
 # `web-thread-select`
 
 This crate allows selecting between `web-thread` and `web-thread-shim`
