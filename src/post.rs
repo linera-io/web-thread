@@ -142,3 +142,28 @@ where
         }
     }
 }
+
+impl<T: Post, U: Post> Post for (T, U)
+where
+    (T, U): AsJs,
+{
+    fn transferables(&self) -> js_sys::Array {
+        let mut array = js_sys::Array::new();
+        array = array.concat(&self.0.transferables());
+        array = array.concat(&self.1.transferables());
+        array
+    }
+}
+
+impl<T: Post> Post for Vec<T>
+where
+    Vec<T>: AsJs,
+{
+    fn transferables(&self) -> js_sys::Array {
+        let mut array = js_sys::Array::new();
+        for x in self {
+            array = array.concat(&x.transferables());
+        }
+        array
+    }
+}
