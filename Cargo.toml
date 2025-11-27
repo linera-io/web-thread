@@ -12,7 +12,7 @@ members = [
   repository = "https://github.com/linera-io/web-thread"
 
   [workspace.dependencies.web-thread]
-  version = "0.2.1"
+  version = "0.2.2"
   path = "."
 
   [workspace.dependencies.web-thread-shim]
@@ -29,7 +29,7 @@ pedantic = "warn"
 [package]
 name = "web-thread"
 description = "Convenient Web worker threading library with transferable support"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 
 license.workspace = true
