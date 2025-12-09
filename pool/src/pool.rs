@@ -8,7 +8,7 @@ struct Inner<T, F = fn() -> T> {
     factory: F,
 }
 
-/// A pool of shared resources, each of which can only be used once.
+/// A pool of shared resources, each of which can only be used once at a time.
 pub struct Pool<T, F = fn() -> T> {
     inner: Mutex<Inner<T, F>>,
     capacity: usize,
@@ -19,12 +19,17 @@ pub struct Pool<T, F = fn() -> T> {
     receiver: flume::Receiver<*const T>,
 }
 
+unsafe impl<T: Sync, F: Sync> Sync for Pool<T, F> {}
+unsafe impl<T: Send, F: Send> Send for Pool<T, F> {}
+
 /// A reference into the [`Pool`] that keeps its referent from being
 /// used again until dropped.
 pub struct Guard<'a, T> {
     resource: &'a T,
     sender: flume::Sender<*const T>,
 }
+
+unsafe impl<T: Sync> Send for Guard<'_, T> {}
 
 impl<T> std::ops::Deref for Guard<'_, T> {
     type Target = T;
