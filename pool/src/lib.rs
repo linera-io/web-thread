@@ -7,10 +7,11 @@ use std::{
     task::{Context, Poll},
 };
 
-pub use web_thread_select as web_thread;
+use web_thread_select as web_thread;
 
 type Id = usize;
 
+pub use web_thread::Error;
 pub type Task<T> = Guard<web_thread::Task<T>>;
 pub type SendTask<T> = Guard<web_thread::SendTask<T>>;
 
