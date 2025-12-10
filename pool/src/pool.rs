@@ -1,9 +1,13 @@
 // Copyright (c) Zefchain Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 type Id = usize;
+
+// Any type.
+trait Type {}
+impl<T> Type for T {}
 
 struct Inner<T, F = fn() -> T> {
     resources: Vec<T>,
@@ -19,6 +23,54 @@ pub struct Pool<T, F = fn() -> T> {
     // receive using a reference: otherwise we would have to hold the
     // mutex guard over the await
     receiver: flume::Receiver<Id>,
+}
+
+pub struct OwnedGuard<T: 'static> {
+    _pool: Arc<dyn Type>,
+    resource: &'static T,
+    id: Id,
+    sender: flume::Sender<Id>,
+}
+
+impl<T: 'static> std::ops::Deref for OwnedGuard<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.resource
+    }
+}
+
+impl<T: 'static> Drop for OwnedGuard<T> {
+    fn drop(&mut self) {
+        let _ = self.sender.send(self.id);
+    }
+}
+
+impl<T> OwnedGuard<T> {
+    /// # Safety
+    /// The `Guard` must refer to the `Pool`.
+    unsafe fn new<F: 'static>(pool: Arc<Pool<T, F>>, guard: Guard<'_, T>) -> Self {
+        let guard = std::mem::ManuallyDrop::new(guard);
+        OwnedGuard {
+            _pool: pool,
+            resource: unsafe {
+                // SAFETY:
+                // This is safe because the `Arc` will keep the pool
+                // alive, and (as detailed below) the items of a live pool
+                // are never deallocated.
+
+                &*(guard.resource as *const _)
+            },
+            id: guard.id,
+            sender: unsafe {
+                // SAFETY:
+                // Because the type is `ManuallyDrop` we don't call
+                // the `drop` implementation and this field is never
+                // accessed again.
+                std::ptr::read(&guard.sender as *const _)
+            },
+        }
+    }
 }
 
 /// A reference into the [`Pool`] that keeps its referent from being
@@ -98,6 +150,15 @@ impl<T, F: FnMut() -> T> Pool<T, F> {
             },
             id,
             sender: self.sender.clone(),
+        }
+    }
+
+    pub async fn get_owned(self: Arc<Self>) -> OwnedGuard<T> where T: 'static, F: 'static {
+        let pool  = self.clone();
+        let guard = self.get().await;
+        unsafe {
+            // Safety: the guard refers to this pool.
+            OwnedGuard::new(pool, guard)
         }
     }
 }
