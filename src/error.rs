@@ -36,8 +36,8 @@ impl From<JsValue> for Error {
         Error {
             description: error.message().into(),
             source: Some(error.cause())
-                .filter(JsValue::is_undefined)
-                .map(|x| Box::new(Error::from(x))),
+                .filter(|cause| !cause.is_undefined() && !cause.is_null())
+                .map(|cause| Box::new(Error::from(cause))),
         }
     }
 }
