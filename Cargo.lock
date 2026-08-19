@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "web-thread"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "futures",
  "pin-project-lite",
